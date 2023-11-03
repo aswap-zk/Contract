@@ -7,7 +7,12 @@ ASWAP is a decentralized exchange (DEX) built on top of Aleo blockchain. It leve
 ## Functions
 
 ### Aswap Contract
+- Single Asset Liquidity Providing
+- Pair Liquidity Providing
+- Swap
 
 
 ### Aswap Staking Contract
-
+- Stake Aleo
+- Stake Other Assets
+- Earn rewards

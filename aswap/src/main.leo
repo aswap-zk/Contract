@@ -2,28 +2,30 @@ import credits.leo;
 
 // The 'Aswap' program.
 program aswap.aleo {
-    mapping tokens : u128 => TokenInfo;
-    mapping balances: address => (uint128 => uint128);
-    mapping allowance: address => (address => u128);
-
-    mapping pairs : u128 => Pair;
-
     record PrivateToken {
         // The token owner
         owner: address,
-        // The token name
-        token: string,
-        // The token symbol
-        symbol: string,
+        // The token index
+        id: u128,
         // The token amount
         amount: u128,
     }
 
     struct TokenInfo {
-        name: string,
-        symbol: string,
+        id: u128,
         decimals: u8,
         total_supply: u128,
+    }
+
+    struct BalanceInfo {
+        token: u128,
+        amount: u128,
+    }
+
+    struct AllowanceInfo {
+        token: u128,
+        spender: address,
+        amount: u128,
     }
 
     struct Pair {
@@ -32,71 +34,94 @@ program aswap.aleo {
         reserve_a: u128,
         reserve_b: u128,
     }
+    
+    mapping tokens : u128 => TokenInfo;
+    mapping balances: address => BalanceInfo;
+    mapping allowance: address => AllowanceInfo;
+    mapping pairs : u128 => Pair;
 
 
     // ========================= token ========================= // 
     // Create a new token.
-    transition create_token(public info: TokenInfo, token_id: uint128,) {
-        assert(info.name != "");
-        return then finalize(info, self.caller);
+    transition create_token(public info: TokenInfo, token_id: u128,) {
+        return then finalize(info, token_id);
     }
-    finalize create_token(public info: TokenInfo, token_id: uint128, public caller: address) {
+    finalize create_token(public info: TokenInfo, token_id: u128) {
         Mapping::set(tokens, token_id, info);
     }
 
     // Transfer public tokens.
-    transition transfer(public token_id: field, public to: address, public amount: u128) {
+    transition transfer(public token_id: u128, public to: address, public amount: u128) {
         return then finalize(token_id, self.caller, to, amount);
     }
-    finalize transfer(public token_id: field, public from: address, public to: address, public amount: u128) {
+    finalize transfer(public token_id: u128, public from: address, public to: address, public amount: u128) {
         // confirm token exists
         assert(Mapping::contains(tokens, token_id));
-        let bid_from: field = get_balance_id(token_id, from);
-        let bal_from: u128 = Mapping::get(balances, bid_from);
-        Mapping::set(balances, bid_from, bal_from - amount);
+        let bal_from: BalanceInfo = Mapping::get(balances, from);
+        let newBalanceInfoFrom : BalanceInfo = BalanceInfo {
+            token: token_id,
+            amount: bal_from.amount - amount,
+        };
+        Mapping::set(balances, from, newBalanceInfoFrom);
 
-        let bid_to: field = get_balance_id(token_id, to);
-        let bal_to: u128 = Mapping::get_or_use(balances, bid_to, 0u128);
-        Mapping::set(balances, bid_to, bal_to + amount);
+        let bal_to: BalanceInfo = Mapping::get(balances, to);
+        let newBalanceInfoTo : BalanceInfo = BalanceInfo {
+            token: token_id,
+            amount: bal_to.amount + amount,
+        };
+        Mapping::set(balances, to, newBalanceInfoTo);
     }
 
     // Authorize other accounts to spend tokens.
-    transition approve(public token_id: field, public spender: address, public amount: u128) {
-        return then finalize(token_id, self.caller, spender, amount);
+    transition approve(public token_info: TokenInfo, public spender: address, public amount: u128) {
+        return then finalize(token_info, self.caller, spender, amount);
     }
-    finalize approve(public token_id: field, public caller: address, public spender: address, public amount: u128) {
+    finalize approve(public token_info: TokenInfo, public caller: address, public spender: address, public amount: u128) {
         // confirm token exists
-        assert(Mapping::contains(tokens, token_id));
-        let key: field = get_allowance_id(token_id, caller, spender);
-        Mapping::set(allowance, key, amount);
+        assert(Mapping::contains(tokens, token_info.id));
+        let allowanceObj : AllowanceInfo = AllowanceInfo {
+            token: token_info.id,
+            spender: spender,
+            amount: amount,
+        };
+        Mapping::set(allowance, caller, allowanceObj);
     }
 
     // Transfer public tokens from other accounts.
     transition transfer_from(
-        public token_id: field,
+        public token_info: TokenInfo,
         public from: address,
         public to: address,
         public amount: u128
      ) {
-        return then finalize(self.caller, token_id, from, to, amount);
+        return then finalize(self.caller, token_info, from, to, amount);
     }
     finalize transfer_from(
         public caller: address,
-        public token_id: field,
+        public token_info: TokenInfo,
         public from: address,
         public to: address,
         public amount: u128
     ) {
         // confirm token exists
-        assert(Mapping::contains(tokens, token_id));
-        let key: field = get_allowance_id(token_id, from, caller);
-        Mapping::set(allowance, key, Mapping::get(allowance, key) - amount);
+        assert(Mapping::contains(tokens, token_info));
+        let new_allowance_sender : AllowanceInfo = AllowanceInfo {
+            token: token_info.id,
+            spender: from,
+            amount: Mapping::get(allowance, from).amount - amount,
+        };
+        Mapping::set(allowance, from, new_allowance_sender);
+        let new_balance_sender : BalanceInfo = BalanceInfo {
+            token: token_info.id,
+            amount: Mapping::get(balances, from).amount - amount,
+        }; 
+        Mapping::set(balances, from, new_balance_sender);
 
-        let bid_from: field = get_balance_id(token_id, from);
-        Mapping::set(balances, bid_from, Mapping::get(balances, bid_from) - amount);
-
-        let bid_to: field = get_balance_id(token_id, to);
-        Mapping::set(balances, bid_to, Mapping::get_or_use(balances, bid_to, 0u128) + amount);
+        let new_balance_receiver : BalanceInfo = BalanceInfo {
+            token: token_info.id,
+            amount: Mapping::get(balances, to).amount + amount,
+        };
+        Mapping::set(balances, to, new_balance_receiver);
     }
 
     // Transfer and convert public tokens to a new private token record (PrivateToken).

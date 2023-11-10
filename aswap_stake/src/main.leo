@@ -1,3 +1,5 @@
+import credits.aleo;
+
 // The 'aswap_stake' program.
 program aswap_stake.aleo {
     // Stake Aleo

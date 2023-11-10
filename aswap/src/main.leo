@@ -2,56 +2,26 @@ import credits.leo;
 
 // The 'Aswap' program.
 program aswap.aleo {
-    // BalanceKeyData => balance
-    mapping balances: field => u128;
-    // AllowanceKeyData => amount
-    mapping allowance: field => u128;
-    // token_id => TokenInfo
-    mapping tokens: field => TokenInfo;
-    // token_id => faucet amount
-    mapping faucets: field => u128;
-    // true => GlobalState
-    mapping global_state: bool => GlobalState;
-    // PairKeyData => Pair
-    mapping pairs: field => Pair;
-    // index => UnwrapItem
-    mapping unwraps: u64 => UnwrapItem;
-    // true => WrapState
-    mapping wrap_state: bool => WrapState;
+    mapping tokens : u128 => TokenInfo;
+    mapping balances: address => (uint128 => uint128);
+    mapping allowance: address => (address => u128);
 
     record PrivateToken {
         // The token owner
         owner: address,
-        // The token id
-        token: field,
+        // The token name
+        token: string,
+        // The token symbol
+        symbol: string,
         // The token amount
         amount: u128,
     }
 
     struct TokenInfo {
-        name: field,
-        symbol: field,
+        name: string,
+        symbol: string,
         decimals: u8,
         total_supply: u128,
-        admin: address,
-    }
-
-    struct GlobalState {
-        // The id of token to be created by the next call to create_token
-        next_token_id: field,
-        admin: address,
-    }
-
-    struct BalanceKeyData {
-        token: field,
-        user: address,
-    }
-
-    // Mapping key of allowance
-    struct AllowanceKeyData {
-        token: field,
-        payer: address,
-        spender: address,
     }
 
     struct Pair {
@@ -59,30 +29,16 @@ program aswap.aleo {
         reserve_b: u128,
     }
 
-    // Mapping key of pairs
-    struct PairKeyData {
-        token_a: field,
-        token_b: field,
-    }
 
     // ========================= token =========================
 
     // Create a new token.
-    transition create_token(public info: TokenInfo) {
-        assert(info.name > 0field);
-        // assert(info.total_supply <= 18446744073709551615u128);
+    transition create_token(public info: TokenInfo, token_id: uint128,) {
+        assert(info.name != "");
         return then finalize(info, self.caller);
     }
-    finalize create_token(public info: TokenInfo, public caller: address) {
-        let gs: GlobalState = Mapping::get(global_state, true);
-        let token_id: field = gs.next_token_id;
-        Mapping::set(global_state, true, GlobalState {
-            next_token_id: token_id + 1field,
-            admin: gs.admin,
-        });
+    finalize create_token(public info: TokenInfo, token_id: uint128, public caller: address) {
         Mapping::set(tokens, token_id, info);
-        let balance_id: field = get_balance_id(token_id, caller);
-        Mapping::set(balances, balance_id, info.total_supply);
     }
 
     // Transfer public tokens.
@@ -121,7 +77,6 @@ program aswap.aleo {
      ) {
         return then finalize(self.caller, token_id, from, to, amount);
     }
-
     finalize transfer_from(
         public caller: address,
         public token_id: field,
@@ -141,116 +96,7 @@ program aswap.aleo {
         Mapping::set(balances, bid_to, Mapping::get_or_use(balances, bid_to, 0u128) + amount);
     }
 
-    // ========================= token advanced =========================
 
-    // Configure the faucet amount of the token.
-    // Only the token's admin can successfully perform this operation.
-    transition set_token_faucet(public token_id: field, public amount: u128) {
-        // can not set faucet for WALEO
-        assert(token_id != 0field);
-        return then finalize(self.caller, token_id, amount);
-    }
-
-    finalize set_token_faucet(public caller: address, public token_id: field, public amount: u128) {
-        let ti: TokenInfo = Mapping::get(tokens, token_id);
-        // only admin
-        assert_eq(caller, ti.admin);
-        Mapping::set(faucets, token_id, amount);
-    }
-
-    // Change the token's admin address.
-    // Only the token's admin can successfully perform this operation.
-    transition change_token_admin(public token_id: field, public admin: address) {
-        return then finalize(self.caller, token_id, admin);
-    }
-
-    finalize change_token_admin(public caller: address, public token_id: field, public admin: address) {
-        let ti: TokenInfo = Mapping::get(tokens, token_id);
-        // only admin
-        assert_eq(caller, ti.admin);
-        Mapping::set(tokens, token_id, TokenInfo {
-            name: ti.name,
-            symbol: ti.symbol,
-            decimals: ti.decimals,
-            total_supply: ti.total_supply,
-            admin: admin,
-        });
-    }
-
-    // Obtain some tokens from the token's faucet for free.
-    transition token_faucet(public token_id: field, public to: address) {
-        return then finalize(token_id, to);
-    }
-
-    finalize token_faucet(public token_id: field, public to: address) {
-        let amount: u128 = Mapping::get(faucets, token_id);
-        assert(amount > 0u128);
-        let ti: TokenInfo = Mapping::get(tokens, token_id);
-        // mint
-        Mapping::set(tokens, token_id, TokenInfo {
-            name: ti.name,
-            symbol: ti.symbol,
-            decimals: ti.decimals,
-            total_supply: ti.total_supply + amount,
-            admin: ti.admin,
-        });
-        // update balance
-        let bid_to: field = get_balance_id(token_id, to);
-        Mapping::set(balances, bid_to, Mapping::get_or_use(balances, bid_to, 0u128) + amount);
-    }
-
-    // ========================= admin =========================
-
-    // Initialize the program after deployment.
-    transition init(public b: bool) {
-        return then finalize(self.caller);
-    }
-
-    finalize init(public caller: address) {
-        // init global state
-        let gs: GlobalState = Mapping::get_or_use(global_state, true, GlobalState {
-            next_token_id: 0field,
-            admin: aleo1tdszx3hcgnyp2jw3y3fzvw27vremxcs24u4pys6vptg9y2jfsvps8e8ffz,
-        });
-        assert_eq(gs.next_token_id, 0field);
-        assert_eq(caller, gs.admin);
-        Mapping::set(global_state, true, GlobalState {
-            next_token_id: 1field,
-            admin: gs.admin,
-        });
-
-        // init WALEO token
-        Mapping::set(tokens, 0field, TokenInfo {
-            name: 105716693521782238488585583field,
-            symbol: 374757672271field,
-            decimals: 6u8,
-            total_supply: 0u128,
-            admin: aleo1tdszx3hcgnyp2jw3y3fzvw27vremxcs24u4pys6vptg9y2jfsvps8e8ffz,
-        });
-
-        // init unwrap states
-        Mapping::set(wrap_state, true, WrapState {
-            unwrap_count: 0u64,
-            total_pending_amount: 0u128,
-            unwrap_fee: 0u128,
-        });
-    }
-
-    // Change the main admin of the program.
-    transition change_admin(public admin: address) {
-        return then finalize(self.caller, admin);
-    }
-
-    finalize change_admin(public caller: address, public admin: address) {
-        let gs: GlobalState = Mapping::get(global_state, true);
-        assert_eq(caller, gs.admin);
-        Mapping::set(global_state, true, GlobalState {
-            next_token_id: gs.next_token_id,
-            admin: admin,
-        });
-    }
-
-    // ========================= private token =========================
     // Transfer and convert public tokens to a new private token record (PrivateToken).
     transition transfer_to_private(public token_id: field, private to: address, public amount: u128) -> PrivateToken {
         // mint a new private token
@@ -262,7 +108,6 @@ program aswap.aleo {
         let test_hash: field = BHP256::hash_to_field(pt);
         return pt then finalize(token_id, self.caller, amount);
     }
-
     finalize transfer_to_private(public token_id: field, public from: address, public amount: u128) {
         // confirm token exists
         assert(Mapping::contains(tokens, token_id));
@@ -279,7 +124,6 @@ program aswap.aleo {
         };
         return pt_change then finalize(pt_in.token, to, amount);
     }
-
     finalize transfer_to_public(public token_id: field, public to: address, public amount: u128) {
         // confirm token exists
         assert(Mapping::contains(tokens, token_id));

@@ -6,6 +6,8 @@ program aswap.aleo {
     mapping balances: address => (uint128 => uint128);
     mapping allowance: address => (address => u128);
 
+    mapping pairs : u128 => Pair;
+
     record PrivateToken {
         // The token owner
         owner: address,
@@ -25,13 +27,14 @@ program aswap.aleo {
     }
 
     struct Pair {
+        token_a: u128,
+        token_b: u128,
         reserve_a: u128,
         reserve_b: u128,
     }
 
 
-    // ========================= token =========================
-
+    // ========================= token ========================= // 
     // Create a new token.
     transition create_token(public info: TokenInfo, token_id: uint128,) {
         assert(info.name != "");
@@ -95,7 +98,6 @@ program aswap.aleo {
         let bid_to: field = get_balance_id(token_id, to);
         Mapping::set(balances, bid_to, Mapping::get_or_use(balances, bid_to, 0u128) + amount);
     }
-
 
     // Transfer and convert public tokens to a new private token record (PrivateToken).
     transition transfer_to_private(public token_id: field, private to: address, public amount: u128) -> PrivateToken {
@@ -169,44 +171,38 @@ program aswap.aleo {
     // and its token_id is the same as pair_id: `lp_token_id = pair_id = bhp256_hash({token_a: field, token_b: field})`.
     // The caller's token_a and token_b will be transferred to the program, and LP tokens will be minted to the `to` address.
     transition create_pair(
-        public token_a: field,
-        public token_b: field,
+        public token_a: u128,
+        public token_b: u128,
         public amount_a: u128,
         public amount_b: u128,
-        public to: address
+        public pid: u128
      ) {
         assert(token_a < token_b);
         assert(amount_a > 0u128);
         assert(amount_b > 0u128);
-        return then finalize(self.caller, token_a, token_b, amount_a, amount_b, to);
+        return then finalize(self.caller, token_a, token_b, amount_a, amount_b, pid);
     }
-
     finalize create_pair(
         public caller: address,
-        public token_a: field,
-        public token_b: field,
+        public token_a: u128,
+        public token_b: u128,
         public amount_a: u128,
         public amount_b: u128,
-        public to: address
+        public pid: u128
     ) {
-        let pid: field = get_pair_id(token_a, token_b);
         let liquidity: u128 = sqrt_u128(amount_a * amount_b);
         assert(liquidity > 0u128);
 
-        let ti_pair: TokenInfo = Mapping::get_or_use(tokens, pid, TokenInfo {
-            name: 5183377571718029925300968712562field, // AleoSwap-Pair
-            symbol: 4281168field, // ASP
-            decimals: 6u8,
-            total_supply: 0u128,
-            admin: aleo1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq3ljyzc,
-        });
-        assert_eq(ti_pair.total_supply, 0u128);
+        assert(Mapping::get_or_use(balances, caller, token_a, 0u128))
 
-        let pair: Pair = Mapping::get_or_use(pairs, pid, Pair {
-            reserve_a: 0u128,
-            reserve_b: 0u128,
-        });
+        let token_pair: Pair = Pair {
+            token_a: token_a,
+            token_b: token_b,
+            reserve_a: amount_a,
+            reserve_b: amount_b,
+        };
 
+        Mapping::set(pairs, pid, token_pair);
 
         // update balances
         let bid_a: field = get_balance_id(token_a, caller);

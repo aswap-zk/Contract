@@ -11,17 +11,17 @@ The ASWAP contract facilitates decentralized trading and the provision of liquid
 
 ### Aswap Contract
 
-![Cross chain - Liquidity pool provision process](https://github.com/aswap-zk/Contract/assets/58005728/37916ad1-0dc9-4973-b33d-3909b3b6fe75)
+![Cross chain - Liquidity pool provision process](https://github.com/aswap-zk/.github/assets/96057861/a9b7b98f-95a9-4fa0-a05f-6668a40d7c72)
 - **Pair Add Liquidity**: Initialize or add to ALEO pairs and token pairs liquidity pools
 - **Single Asset Liquidity Providing**: Add a single token asset to the pool, and the Aswap contract can automatically input this with the appropriate ratio in the pool. 
 
-![Cross chain - Swap pool](https://github.com/aswap-zk/Contract/assets/58005728/026bad35-b76e-473c-9f84-88eee432f147)
+![Cross chain - Swap pool](https://github.com/aswap-zk/.github/assets/96057861/986f4aae-a57a-454f-abe9-2f8b0029c58f)
 - **Token Swap**: Execute swaps between ALEO and other tokens or between any two supported tokens.
 
 
 
 ### Aswap Staking Contract
-![Cross chain - Staking](https://github.com/aswap-zk/Contract/assets/58005728/8afc3ef9-4850-44df-8c7f-e9415eff4eda)
+![Cross chain - Staking](https://github.com/aswap-zk/.github/assets/96057861/93a4ee31-4d20-451a-9ad2-40e5da58c87c)
 - **Stake ALEO**: Lock ALEO into the contract to earn rewards.
 - **Stake Other Assets**: Aswap contract support user who want to stake other assets directly 
 - **Earn rewards**: Claim accrued rewards.

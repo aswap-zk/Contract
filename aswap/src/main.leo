@@ -21,6 +21,11 @@ program aswap.aleo {
         from: address,
     }
 
+    struct LiquidityKey {
+        pair: Pair,
+        from: address,
+    }
+
     struct TokenInfo {
         id: u128,
         decimals: u8,
@@ -44,11 +49,17 @@ program aswap.aleo {
         reserve_a: u128,
         reserve_b: u128,
     }
+
+    struct LiquidityInfo {
+        token_a_amount: u128,
+        token_b_amount: u128,
+    }
     
     mapping tokens : u128 => TokenInfo;
     mapping balances: BalanceKey => BalanceInfo;
     mapping allowance: AllowanceKey => AllowanceInfo;
     mapping pairs : u128 => Pair;
+    mapping liquidity_info: LiquidityKey => LiquidityInfo;
 
 
     // ========================= Token Operation ========================= // 
@@ -313,7 +324,7 @@ program aswap.aleo {
         assert(token_a < token_b);
         assert(amount_a > 0u128);
         assert(amount_b > 0u128 && amount_b >= min_b);
-        return then finalize(self.caller, token_a, token_b, amount_a, amount_b, min_b, to);
+        return then finalize(self.caller, token_a, token_b, amount_a, amount_b, min_b, pid);
     }
     finalize add_liquidity_pair(
         public caller: address,
@@ -358,6 +369,17 @@ program aswap.aleo {
             reserve_a: pair.reserve_a + amount_a,
             reserve_b: pair.reserve_b + amount_b,
         });
+
+        // update liquidity info
+        let liquidity_key : LiquidityKey = LiquidityKey {
+            pair: pair,
+            from: caller,
+        };
+
+        Mapping::set(liquidity_info, liquidity_key, LiquidityInfo {
+            token_a_amount: amount_a,
+            token_b_amount: amount_b,
+        }); 
     }
 
     // ========================= Remove Liquidity ========================= //
@@ -368,11 +390,11 @@ program aswap.aleo {
         public token_b: u128,
         public liquidity: u128,
         public min_b: u128,
-        public to: address,
+        public pid: u128,
      ) {
         assert(token_a < token_b);
         assert(liquidity > 0u128);
-        return then finalize(self.caller, token_a, token_b, liquidity, min_b, to);
+        return then finalize(self.caller, token_a, token_b, liquidity, min_b, pid);
     }
     finalize remove_liquidity_pair(
         public caller: address,
@@ -418,11 +440,11 @@ program aswap.aleo {
         public token_out: u128,
         public amount_in: u128,
         public amount_out_min: u128,
-        public to: address,
+        public pid: u128,
      ) {
         assert(token_in != token_out);
         assert(amount_in > 0u128);
-        return then finalize(self.caller, token_in, token_out, amount_in, amount_out_min, to);
+        return then finalize(self.caller, token_in, token_out, amount_in, amount_out_min, pid);
     }
     finalize swap_exact_tokens_for_tokens(
         public caller: address,
@@ -501,31 +523,31 @@ program aswap.aleo {
     inline log2(value: u128) -> u32 {
         let result: u32 = 0u32;
         if value >> 128u32 > 0u128 {
-            value >>= 128u32;
+            value >>= 128u128;
             result += 128u32;
         }
         if value >> 64u32 > 0u32 {
-            value >>= 64u32;
+            value >>= 64u128;
             result += 64u32;
         }
         if value >> 32u32 > 0u32 {
-            value >>= 32u32;
+            value >>= 32u128;
             result += 32u32;
         }
         if value >> 16u32 > 0u32 {
-            value >>= 16u32;
+            value >>= 16u128;
             result += 16u32;
         }
         if value >> 8u32 > 0u32 {
-            value >>= 8u32;
+            value >>= 8u128;
             result += 8u32;
         }
         if value >> 4u32 > 0u32 {
-            value >>= 4u32;
+            value >>= 4u128;
             result += 4u32;
         }
         if value >> 2u32 > 0u32 {
-            value >>= 2u32;
+            value >>= 2u128;
             result += 2u32;
         }
         if value >> 1u32 > 0u128 {

@@ -311,8 +311,6 @@ program aswap.aleo {
     }
 
     // ========================= Add Liquidity ========================= //
-    // Add liquidity to a pair.
-    // The caller's `token_a` and `token_b` will be transferred to the program, and LP tokens will be minted to the `to` address.
     transition add_liquidity_pair(
         public token_a: u128,
         public token_b: u128,
@@ -383,8 +381,6 @@ program aswap.aleo {
     }
 
     // ========================= Remove Liquidity ========================= //
-    // Remove liquidity from a pair.
-    // The caller's LP tokens will be burned, `token_a` and `token_b` will be transferred to the `to` address.
     transition remove_liquidity_pair(
         public token_a: u128,
         public token_b: u128,
@@ -406,35 +402,56 @@ program aswap.aleo {
     ) {
         let pair: Pair = Mapping::get(pairs, pid);
 
-        // // calculate token amounts
-        // let amount_a: u128 = liquidity * pair.reserve_a / ti_pair.total_supply;
-        // let amount_b: u128 = liquidity * pair.reserve_b / ti_pair.total_supply;
-        // assert(amount_a >= min_a && amount_b >= min_b);
-        // assert(amount_a > 0u128 || amount_b > 0u128);
+        // calculate liquidity amounts of user
+        let liquidity_key : LiquidityKey = LiquidityKey {
+            pair: pair,
+            from: caller,
+        };
+        let liq_info: LiquidityInfo = Mapping::get(liquidity_info, liquidity_key);
+        let liquidity_mul: u128 = (liq_info.token_a_amount * liq_info.token_b_amount);
+        
+        // calculate token amounts
+        let rate: u128 = sqrt_u128(liquidity / (pair.reserve_a * pair.reserve_b));
+        let amount_a : u128 = pair.reserve_a * rate;
+        let amount_b : u128 = pair.reserve_b * rate;
 
-        // // burn liquidity
-        // Mapping::set(balances, bid_p, Mapping::get(balances, bid_p) - liquidity);
-        // Mapping::set(tokens, pid, TokenInfo {
-        //     name: ti_pair.name,
-        //     symbol: ti_pair.symbol,
-        //     decimals: ti_pair.decimals,
-        //     total_supply: ti_pair.total_supply - liquidity,
-        //     admin: ti_pair.admin,
-        // });
+        // burn liquidity
+        assert(amount_a >= liq_info.token_a_amount && amount_b >= liq_info.token_b_amount);
+        Mapping::set(liquidity_info, liquidity_key, LiquidityInfo {
+            token_a_amount: liq_info.token_a_amount - amount_a,
+            token_b_amount: liq_info.token_b_amount - amount_b,
+        });
 
-        // // update pair
-        // Mapping::set(pairs, pid, Pair {
-        //     reserve_a: pair.reserve_a - amount_a,
-        //     reserve_b: pair.reserve_b - amount_b,
-        // });
+        // update pair
+        Mapping::set(pairs, pid, Pair {
+            token_a: token_a,
+            token_b: token_b,
+            reserve_a: pair.reserve_a - amount_a,
+            reserve_b: pair.reserve_b - amount_b,
+        });
 
-        // // send tokens
-        // Mapping::set(balances, bid_a, Mapping::get_or_use(balances, bid_a, 0u128) + amount_a);
-        // Mapping::set(balances, bid_b, Mapping::get_or_use(balances, bid_b, 0u128) + amount_b);
+        // send tokens
+        let balance_key_a : BalanceKey = BalanceKey {
+            token: token_a,
+            from: caller,
+        };
+        let balance_key_b : BalanceKey = BalanceKey {
+            token: token_b,
+            from: caller,
+        };
+        let new_balance_info_a : BalanceInfo = BalanceInfo {
+            token: token_a,
+            amount: Mapping::get(balances, balance_key_a).amount + amount_a,
+        };
+        let new_balance_info_b : BalanceInfo = BalanceInfo {
+            token: token_b,
+            amount: Mapping::get(balances, balance_key_b).amount + amount_b,
+        };
+        Mapping::set(balances, balance_key_a, new_balance_info_a);
+        Mapping::set(balances, balance_key_b, new_balance_info_b);
     }
 
     // ========================= swap exact ========================= //
-    // Exchange a fixed amount of public input tokens for a variable amount of public output tokens.
     transition swap_exact_tokens_for_tokens(
         public token_in: u128,
         public token_out: u128,

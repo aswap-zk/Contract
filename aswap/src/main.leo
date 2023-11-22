@@ -1,5 +1,3 @@
-import credits.leo;
-
 // The 'Aswap' program.
 program aswap.aleo {
     record PrivateToken {
@@ -88,7 +86,6 @@ program aswap.aleo {
             amount: bal_from.amount - amount,
         };
         Mapping::set(balances, balance_key_from, newBalanceInfoFrom);
-
         let balance_key_to : BalanceKey = BalanceKey {
             token: token_id,
             from: to,
